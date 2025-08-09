@@ -61,21 +61,36 @@ class AuthService {
   // Login method
   async login(credentials: LoginCredentials): Promise<{ success: boolean; error?: string; user?: User }> {
     try {
-      const response = await apiClient.request<AuthResponse>('/auth/login', {
+      // FastAPI expects form data for OAuth2PasswordRequestForm
+      const formData = new FormData();
+      formData.append('username', credentials.email); // OAuth2 uses 'username' field for email
+      formData.append('password', credentials.password);
+
+      const response = await fetch(`${apiClient.baseUrl}/api/v1/auth/login`, {
         method: 'POST',
-        body: JSON.stringify(credentials),
+        body: formData,
       });
 
-      if (response.error) {
-        return { success: false, error: response.error };
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.detail || 'Login failed' };
       }
 
-      if (response.data) {
-        this.setAuth(response.data.access_token, response.data.user);
-        return { success: true, user: response.data.user };
+      // Get user data after successful login
+      const userResponse = await apiClient.request<User>('/auth/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${data.access_token}`,
+        },
+      });
+
+      if (userResponse.data) {
+        this.setAuth(data.access_token, userResponse.data);
+        return { success: true, user: userResponse.data };
       }
 
-      return { success: false, error: 'Invalid response format' };
+      return { success: false, error: 'Failed to get user data' };
     } catch (error) {
       return { 
         success: false, 
@@ -87,7 +102,7 @@ class AuthService {
   // Register method
   async register(data: RegisterData): Promise<{ success: boolean; error?: string; user?: User }> {
     try {
-      const response = await apiClient.request<AuthResponse>('/auth/register', {
+      const response = await apiClient.request<User>('/auth/signup', {
         method: 'POST',
         body: JSON.stringify(data),
       });
@@ -97,11 +112,16 @@ class AuthService {
       }
 
       if (response.data) {
-        this.setAuth(response.data.access_token, response.data.user);
-        return { success: true, user: response.data.user };
+        // After successful registration, login the user
+        const loginResult = await this.login({
+          email: data.email,
+          password: data.password,
+        });
+        
+        return loginResult;
       }
 
-      return { success: false, error: 'Invalid response format' };
+      return { success: false, error: 'Registration failed' };
     } catch (error) {
       return { 
         success: false, 

@@ -10,7 +10,7 @@ interface ApiResponse<T> {
 }
 
 class ApiClient {
-  private baseUrl: string;
+  public baseUrl: string;
   private token: string | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
