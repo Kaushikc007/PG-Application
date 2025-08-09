@@ -1,0 +1,169 @@
+version: '3'
+
+vars:
+  BACKEND_DIR: backend
+  FRONTEND_DIR: .
+  PYTHON: python3
+  PIP: pip3
+
+tasks:
+  # Development tasks
+  dev:
+    desc: Run both frontend and backend in development mode
+    deps: [backend:dev, frontend:dev]
+
+  # Backend tasks
+  backend:install:
+    desc: Install backend dependencies
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - "{{.PIP}} install -r requirements.txt"
+
+  backend:dev:
+    desc: Run backend development server
+    dir: "{{.BACKEND_DIR}}"
+    deps: [backend:install]
+    cmds:
+      - "{{.PYTHON}} run_dev.py"
+
+  backend:init-db:
+    desc: Initialize and seed the database
+    dir: "{{.BACKEND_DIR}}"
+    deps: [backend:install]
+    cmds:
+      - "{{.PYTHON}} seed_db.py"
+
+  backend:test:
+    desc: Test backend API endpoints
+    dir: "{{.BACKEND_DIR}}"
+    deps: [backend:install]
+    cmds:
+      - "{{.PYTHON}} test_api.py"
+
+  backend:format:
+    desc: Format backend code
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - black app/ --line-length 100
+      - isort app/ --profile black
+
+  backend:lint:
+    desc: Lint backend code
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - flake8 app/ --max-line-length 100 --ignore E203,W503
+
+  # Frontend tasks
+  frontend:install:
+    desc: Install frontend dependencies
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm install
+
+  frontend:dev:
+    desc: Run frontend development server
+    dir: "{{.FRONTEND_DIR}}"
+    deps: [frontend:install]
+    cmds:
+      - npm run dev
+
+  frontend:build:
+    desc: Build frontend for production
+    dir: "{{.FRONTEND_DIR}}"
+    deps: [frontend:install]
+    cmds:
+      - npm run build
+
+  frontend:lint:
+    desc: Lint frontend code
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm run lint
+
+  frontend:type-check:
+    desc: Type check frontend code
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm run type-check
+
+  # Database tasks
+  db:reset:
+    desc: Reset and reinitialize database
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - rm -f pg_application.db
+      - "{{.PYTHON}} seed_db.py"
+
+  db:backup:
+    desc: Backup database
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - cp pg_application.db pg_application_backup_$(date +%Y%m%d_%H%M%S).db
+
+  # Testing tasks
+  test:
+    desc: Run all tests
+    deps: [backend:test, frontend:test]
+
+  frontend:test:
+    desc: Run frontend tests
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm run test
+
+  # Production tasks
+  prod:build:
+    desc: Build for production
+    deps: [frontend:build]
+
+  prod:start:
+    desc: Start production server
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - uvicorn main:app --host 0.0.0.0 --port 8000
+
+  # Docker tasks
+  docker:build:
+    desc: Build Docker images
+    cmds:
+      - docker build -t pg-app-backend ./backend
+      - docker build -t pg-app-frontend .
+
+  docker:up:
+    desc: Start services with Docker Compose
+    cmds:
+      - docker-compose up -d
+
+  docker:down:
+    desc: Stop Docker services
+    cmds:
+      - docker-compose down
+
+  # Utility tasks
+  clean:
+    desc: Clean project files
+    cmds:
+      - rm -rf node_modules
+      - rm -rf "{{.BACKEND_DIR}}/__pycache__"
+      - rm -rf "{{.BACKEND_DIR}}/app/__pycache__"
+      - rm -rf "{{.BACKEND_DIR}}/.pytest_cache"
+      - rm -rf .next
+      - rm -rf dist
+      - rm -rf build
+
+  setup:
+    desc: Initial project setup
+    cmds:
+      - task: backend:install
+      - task: frontend:install
+      - task: backend:init-db
+
+  check:
+    desc: Run all checks (lint, type-check, etc.)
+    deps: [backend:lint, frontend:lint, frontend:type-check]
+
+  # Help task
+  help:
+    desc: Show available tasks
+    cmds:
+      - task --list
