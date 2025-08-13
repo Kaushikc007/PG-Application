@@ -65,6 +65,7 @@ model User {
   // Owner specific
   ownerProfile  OwnerProfile?
   properties    Property[]
+  invitations   Invitation[]
 }
 
 model VerificationToken {
@@ -130,6 +131,7 @@ model Property {
   rooms        Room[]
   tenants      Tenant[]
   payments     Payment[]
+  invitations  Invitation[]
 }
 
 model Room {
@@ -143,8 +145,9 @@ model Room {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  tenants  Tenant[]
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenants     Tenant[]
+  invitations Invitation[]
 }
 
 model Tenant {
@@ -181,6 +184,26 @@ model Payment {
   
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+// Invitation tokens for QR based tenant onboarding
+model Invitation {
+  id         String   @id @default(cuid())
+  token      String   @unique              // Secure random slug encoded in QR
+  propertyId String
+  ownerId    String                        // Owner who created it
+  roomId     String?                       // Optional room pre-assignment
+  maxUses    Int      @default(1)
+  useCount   Int      @default(0)
+  expiresAt  DateTime?                     // Optional expiry
+  usedAt     DateTime?                     // First use timestamp (for single-use)
+  metadata   String?                       // JSON string for future extensibility
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  room     Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
 }
 
 model Application {

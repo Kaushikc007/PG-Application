@@ -5,6 +5,10 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import ProfileModal from '@/components/ProfileModal';
+import dynamic from 'next/dynamic';
+
+// Load QR component client-side only (it uses window for canvas indirectly)
+const CreateInviteQR = dynamic(() => import('@/components/CreateInviteQR'), { ssr: false });
 
 interface Property {
   id: string;
@@ -369,6 +373,11 @@ export default function OwnerDashboard() {
                   </option>
                 ))}
               </select>
+              {selectedProperty && (
+                <div className="mt-6">
+                  <CreateInviteQR propertyId={selectedProperty} />
+                </div>
+              )}
             </div>
 
             {/* Tenants List */}
